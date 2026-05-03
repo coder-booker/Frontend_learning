@@ -260,3 +260,5 @@
 # 其他
 - 截长图
     - chrome：开发者工具，右上角三个点，输入找 capture full size screen shot
+- perplexity
+  - \s\[[^\]]+\]\((https?:\/\/[^\s)]+)\)

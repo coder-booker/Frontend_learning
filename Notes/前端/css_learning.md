@@ -83,10 +83,10 @@
 - 有两种盒模型
     - W3C 标准盒子模型
         - box-sizing: content-box
-        - 只算content的宽高，不包含border到padding
+        - 包含了margin
     - IE 怪异盒子模型
         - box-sizing: border-box
-        - 算上border，当然也算上其内的滚动条和padding
+        - 算上border，不包含 margin
 # 各种attr
 - 这些属性在不同浏览器会有很多很多不同行为，因此大概知道意义就好了
 - client
@@ -148,6 +148,7 @@
         - 注意clear的含义其实就是不允许某个方向上有元素浮动，所以float的left和right与clear的left和right注意需要互相对着
             - 比如float在前且float:left，你后面的元素clear:right是没用的
             - 此外，因为float前的块会顶开float，对前块设置clear没用
+    - float 的设置会隐性转换元素为 block
 - 文本
     - 垂直居中：
         - `line-height`和`height`一样

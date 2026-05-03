@@ -309,6 +309,7 @@
 # 对象/object
 - 万物皆对象
 - `this`指向调用者的上下文
+- 赋值是引用
 - 全局对象
     - 非严格模式下为window，全局变量和独立函数、匿名函数都为其属性与方法，它们的this也会指向widnow
     - 严格模式下this返回的是undefined
@@ -652,6 +653,33 @@
 - 迭代器
     - 
 
+# prototype
+- prototype 和 __proto__
+  - `Object.prototype` 是构造函数下放给孩子的 prototype，不是其自己的原型链上级
+  - `object.__proto__` 是实例指向 prototype 的指针，但指针对对象来说就是对象本身。
+  - `实例.__proto__ === 构造函数.prototype`
+- 函数构造出来的实例不是函数，所以才要区分 __proto__ 和 prototype，避免函数的方法传播到实例中
+- 必须把所有对象理解成一个挂在原型链上的寄生虫。对象本身其实不参与原型链的传播，是对象的 .prototype 在原型链上而已。所以继承的对象的 __proto__ 的原型是上级的 .prototype.__proto__ 而不是上级的 .__poto__。也因此一个函数的 __proto__ 和 prototype 是完全不一样的存在（对象没有 prototype）
+  - 函数.__proto__ = Function.prototype, 函数.prototype.__proto__ = Object.prototype
+- 只有构造函数才有 prototype
+- 记住，对象会不断往原型链上回溯，直到找到了访问的属性或者到尽头 (Object.prototype.__proto__) 了
+  - 记住，找原型链的路线是：abc.__proto__ -> abc.__proto__.__proto__ -> abc.__proto__.__proto__.__proto__ -> ... -> Object.prototype -> Object.prototype.__proto__ -> null
+- 非箭头函数被实例化时，其实是把这个函数当成构造函数来跑了。js 会：
+  1. 创建空对象，称为 funcObj
+  2. 把 funcObj.__proto__ 指向 Func.prototype
+  3. 把 funcObj 的 this 绑定为 funcObj
+  4. 把函数的返回值当成 new 的结果，抛弃 funcObj。注意如果没有返回或者返回的是非引用类型，则不抛弃 funcObj ，返回 funcObj
+  - 内部的 this.aaa = bbb 的操作
+- 函数对全局的 prototype 污染
+  - 如果函数没有当成构造函数，运行之后内部对 this 的操作就会污染全局对象，因为非箭头函数的 this 默认挂在全局
+- 非常特殊的例子：万物起源
+```js
+console.log(Function.__proto__ === Function.prototype);  // true。这是 JS 中最反直觉的一条规则。Function 作为一个内置函数，它是由自己创造的。因此，作为实例，它的 __proto__ 指向了创造它的构造函数（也就是它自己）的 prototype 。
+console.log(Object.__proto__ === Function.prototype);  // true。Object 也是一个内置函数（因为你可以 new Object()）。只要是函数，就都是 Function 的实例，所以 Object 的 __proto__ 指向了 Function.prototype 。
+console.log(Object.prototype.__proto__ === null);  // true。这是原型链的终点。Object.prototype 是所有对象的老祖宗，如果在它身上还是找不到属性，引擎就不会再往下找了。为了防止死循环，它的 __proto__ 被设计为指向 null 。
+```
+
+
 # 变量
 - 暂时性死区
     - 只要一进入当前作用域，所要使用的变量就已经存在了，但不可获取（否则报错），只有等到声明的那一行代码出现，才可以获取和使用。
@@ -704,13 +732,12 @@
 - Promise大致流程：
     - Promise实例化后立刻执行executor函数，状态改变后创建一个新的微任务，这个微任务的任务就是处理Promise操作的下一个状态阶段的回调函数，例如.then的和.catch的
     - 但状态改变的语句可以被异步操作的回调包裹，这样异步操作结束后才会改变状态。Promise也是因此适合异步操作
-- executor内的同步代码会被立刻运行，异步代码则会被正常加入任务队列，如果这些异步代码使用了resolve或reject则会触发整个promise的状态改变
 - 注意事项：
     - 注意Promise必须要显性改变状态，否则不会进入下一个阶段
     - 因为executor的运行是同步的，但插入的微任务是异步的，所以出现".then在同步代码后运行"的现象是正常的
     - **所以Promise本身并不是微任务，状态改变的回调才是**。
     - **当把async或者Promise当作回调传给别的方法时，要注意别的方法不会await这个异步操作，因此回调返回的一定是一个Promise而非结果的值**
-        - 这可能导致一些错误，比如Array.prototype.every会衡为真
+        - 这可能导致一些错误，比如 Promise 的同步返回值衡为真
 - `new Promise((resolve, reject) => { resolve("value"); reject("error") })`
     - 接收一个executor函数，这个函数可以选择pending Promise传入的`resolve`和`reject`状态改变函数。
         - `resolve`把Promise变为fulfilled态，`reject`则变为rejected态，然后把各自的.then或者.catch中的回调函数推入微任务队列等待执行
@@ -735,7 +762,7 @@
                 (value) => Promise.resolve(onFinally()).then(() => value),
                 (reason) =>
                     Promise.resolve(onFinally()).then(() => {
-                    throw reason;
+                      throw reason;
                     }),
             );
             ```
@@ -749,7 +776,7 @@
     - async本质就是把函数内的代码作为executor传入一个Promise并尝试返回这个Promise。return时就是resolve调用时。所以async也是立刻执行的
     - 会默认返回undefined的resolve
     - await的原理
-        - 仍然会继续运行同步代码，但如果遇到异步代码会暂停上一级调用该async函数的代码运行，返回一个Promise
+        - 仍然会继续运行同步代码，但如果遇到异步代码会暂停当前的代码运行，返回一个Promise
         - Promise的状态脱离pending就会创建一个**返回这个作用域这一行后继续运行**的微任务。注意最后await获得的值是：fulfilled就返回resolve传递的值，rejected就直接抛出错误。
         - await与后一行之间可能会被同步代码插队。
         - 底层是用的**yield**
@@ -1328,6 +1355,14 @@ function sendMsg() {
     ```
 
 
+# 跨域
+- 浏览器会检测某response有没有`Access-Allow-Control-Origin`，有的话允许什么路径
+- 同域：域名、端口、协议相同
+- 所以其实request不会被拦截，是response会。
+- 解决方法：
+  - JSONP（JSON with Padding）是早期前端非常经典的一种跨域方案。由于 `<script>` 标签的 src 属性不受同源策略限制，JSONP 利用这个特性向服务器请求脚本，服务器返回一个函数调用，从而实现跨域数据获取。
+  - 对于两个页面处于同一个基础主域，但子域不同的情况（比如 a.example.com 和 b.example.com），可以通过在两个页面中都设置 document.domain = 'example.com' 来实现降域，从而允许它们跨域访问对方的 DOM 或共享 Cookie。
+  - window.name 是一个特殊的属性，当窗口的地址发生变化时（即使跨域了），window.name 的值也不会改变，并且它能存储较大的数据。利用 iframe 和修改 iframe 的源，可以通过 window.name 巧妙地实现跨域数据传递。
 
 
 # other
